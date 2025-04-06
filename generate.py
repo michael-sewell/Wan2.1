@@ -398,24 +398,25 @@ def generate(args):
 
             # Clamp to valid range
             video = video.clamp(-1, 1).float()
-
-            # Log shape and value range
             logging.info(f"Saving video tensor of shape {video.shape}, min={video.min().item():.4f}, max={video.max().item():.4f}")
 
             try:
-                # Normalize from [-1, 1] to [0, 255] for video
+                # Normalize and scale to [0, 255]
                 video_norm = ((video + 1.0) / 2.0 * 255.0).clamp(0, 255).to(torch.uint8)
 
-                # Log dtype and shape
+                # Reverse channel order (BGR -> RGB)
+                if video_norm.shape[0] == 3:
+                    logging.info("Reordering channels from BGR to RGB")
+                    video_norm = video_norm[[2, 1, 0], :, :, :]
+
                 logging.info(f"Normalized video tensor dtype: {video_norm.dtype}, shape: {video_norm.shape}, min: {video_norm.min()}, max: {video_norm.max()}")
 
-                # Save the video using existing pipeline
                 cache_video(
                     tensor=video_norm[None],  # Add batch dimension
                     save_file=args.save_file,
                     fps=cfg.sample_fps,
                     nrow=1,
-                    normalize=False,  # Already normalized
+                    normalize=False,
                     value_range=(0, 255)
                 )
             except Exception as e:
