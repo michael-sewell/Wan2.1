@@ -401,27 +401,29 @@ def generate(args):
                 video = video.clamp(-1, 1).float()
 
                 # Log shape and range for debug
+                logging.info(f"Saving generated video to {args.save_file}")
+                video = video.clamp(-1, 1).float()
                 logging.info(f"Saving video tensor of shape {video.shape}, min={video.min().item():.4f}, max={video.max().item():.4f}")
 
-                # Normalize from [-1, 1] to [0, 255] and convert to uint8
-                video_norm = ((video + 1.0) / 2.0 * 255.0).clamp(0, 255).to(torch.uint8)
+                try:
+                    # Normalize and fix color order
+                    video_norm = ((video + 1.0) / 2.0 * 255.0).clamp(0, 255)
+                    video_norm = video_norm[[2, 1, 0], :, :, :].to(torch.uint8)
 
-                # Log debug info
-                logging.info(f"Normalized video tensor dtype: {video_norm.dtype}, shape: {video_norm.shape}, min: {video_norm.min()}, max: {video_norm.max()}")
+                    logging.info(f"Normalized video tensor dtype: {video_norm.dtype}, shape: {video_norm.shape}, min: {video_norm.min()}, max: {video_norm.max()}")
 
-                # Try saving
-                cache_video(
-                    tensor=video_norm[None],  # Add batch dimension
-                    save_file=args.save_file,
-                    fps=cfg.sample_fps,
-                    nrow=1,
-                    normalize=False,  # We did it manually
-                    value_range=(0, 255)
-                )
-            except Exception as e:
-                logging.error(f"cache_video failed, error: {e}")
-                with open(args.save_file, "wb") as f:
-                    f.write(b"\x00" * 8)
+                    cache_video(
+                        tensor=video_norm[None],
+                        save_file=args.save_file,
+                        fps=cfg.sample_fps,
+                        nrow=1,
+                        normalize=False,
+                        value_range=(0, 255)
+                    )
+                except Exception as e:
+                    logging.error(f"cache_video failed, error: {e}")
+                    with open(args.save_file, "wb") as f:
+                        f.write(b"\x00" * 8)
 
         logging.info("Finished.")
 
