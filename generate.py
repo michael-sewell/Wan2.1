@@ -392,40 +392,42 @@ def generate(args):
                 save_file=args.save_file,
                 nrow=1,
                 normalize=True,
-                value_range=(-1, 1)
-            )
+                value_range=(-1, 1))
         else:
             logging.info(f"Saving generated video to {args.save_file}")
+
+            # Clamp and convert the tensor to float32 (if needed)
+            video = video.clamp(-1, 1).float()
+
+            # Log shape and value range for debugging
+            logging.info(f"Saving video tensor of shape {video.shape}, min={video.min().item():.4f}, max={video.max().item():.4f}")
+
             try:
-                # Clamp and convert the tensor to float32 (if needed)
-                video = video.clamp(-1, 1).float()
+                # Normalize from [-1, 1] to [0, 255]
+                video_norm = ((video + 1.0) / 2.0 * 255.0).clamp(0, 255)
 
-                # Log shape and range for debug
-                logging.info(f"Saving generated video to {args.save_file}")
-                video = video.clamp(-1, 1).float()
-                logging.info(f"Saving video tensor of shape {video.shape}, min={video.min().item():.4f}, max={video.max().item():.4f}")
+                # Convert from BGR to RGB if needed
+                video_norm = video_norm[[2, 1, 0], :, :, :]  # C, T, H, W
 
-                try:
-                    # Normalize and fix color order
-                    video_norm = ((video + 1.0) / 2.0 * 255.0).clamp(0, 255)
-                    video_norm = video_norm[[2, 1, 0], :, :, :].to(torch.uint8)
+                # Convert to uint8
+                video_norm = video_norm.to(torch.uint8)
 
-                    logging.info(f"Normalized video tensor dtype: {video_norm.dtype}, shape: {video_norm.shape}, min: {video_norm.min()}, max: {video_norm.max()}")
+                # Log final tensor state
+                logging.info(f"Normalized video tensor dtype: {video_norm.dtype}, shape: {video_norm.shape}, min: {video_norm.min()}, max: {video_norm.max()}")
 
-                    cache_video(
-                        tensor=video_norm[None],
-                        save_file=args.save_file,
-                        fps=cfg.sample_fps,
-                        nrow=1,
-                        normalize=False,
-                        value_range=(0, 255)
-                    )
-                except Exception as e:
-                    logging.error(f"cache_video failed, error: {e}")
-                    with open(args.save_file, "wb") as f:
-                        f.write(b"\x00" * 8)
-
-        logging.info("Finished.")
+                # Try saving using the patched cache_video
+                cache_video(
+                    tensor=video_norm[None],  # Add batch dimension
+                    save_file=args.save_file,
+                    fps=cfg.sample_fps,
+                    nrow=1,
+                    normalize=False,  # Already normalized
+                    value_range=(0, 255)
+                )
+            except Exception as e:
+                logging.error(f"cache_video failed, error: {e}")
+                with open(args.save_file, "wb") as f:
+                    f.write(b"\x00" * 8)
 
 
 if __name__ == "__main__":
