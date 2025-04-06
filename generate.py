@@ -396,26 +396,20 @@ def generate(args):
         else:
             logging.info(f"Saving generated video to {args.save_file}")
 
-            # Clamp and convert the tensor to float32 (if needed)
+            # Clamp to valid range
             video = video.clamp(-1, 1).float()
 
-            # Log shape and value range for debugging
+            # Log shape and value range
             logging.info(f"Saving video tensor of shape {video.shape}, min={video.min().item():.4f}, max={video.max().item():.4f}")
 
             try:
-                # Normalize from [-1, 1] to [0, 255]
-                video_norm = ((video + 1.0) / 2.0 * 255.0).clamp(0, 255)
+                # Normalize from [-1, 1] to [0, 255] for video
+                video_norm = ((video + 1.0) / 2.0 * 255.0).clamp(0, 255).to(torch.uint8)
 
-                # Convert from BGR to RGB if needed
-                video_norm = video_norm[[2, 1, 0], :, :, :]  # C, T, H, W
-
-                # Convert to uint8
-                video_norm = video_norm.to(torch.uint8)
-
-                # Log final tensor state
+                # Log dtype and shape
                 logging.info(f"Normalized video tensor dtype: {video_norm.dtype}, shape: {video_norm.shape}, min: {video_norm.min()}, max: {video_norm.max()}")
 
-                # Try saving using the patched cache_video
+                # Save the video using existing pipeline
                 cache_video(
                     tensor=video_norm[None],  # Add batch dimension
                     save_file=args.save_file,
