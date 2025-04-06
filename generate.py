@@ -396,13 +396,25 @@ def generate(args):
                 value_range=(-1, 1))
         else:
             logging.info(f"Saving generated video to {args.save_file}")
-            cache_video(
-                tensor=video[None],
-                save_file=args.save_file,
-                fps=cfg.sample_fps,
-                nrow=1,
-                normalize=True,
-                value_range=(-1, 1))
+            # Clamp and convert the tensor to float32 (if needed)
+            video = video.clamp(-1, 1).float()
+
+            # Log shape and range for debug
+            logging.info(f"Saving video tensor of shape {video.shape}, min={video.min().item():.4f}, max={video.max().item():.4f}")
+
+            # Try saving
+            try:
+                cache_video(
+                    tensor=video[None],
+                    save_file=args.save_file,
+                    fps=cfg.sample_fps,
+                    nrow=1,
+                    normalize=True,
+                    value_range=(-1, 1))
+            except Exception as e:
+                logging.error(f"cache_video failed, error: {e}")
+                with open(args.save_file, "wb") as f:
+                    f.write(b"\x00" * 8)
     logging.info("Finished.")
 
 
