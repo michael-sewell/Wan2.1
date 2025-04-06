@@ -396,23 +396,24 @@ def generate(args):
         else:
             logging.info(f"Saving generated video to {args.save_file}")
 
-            # Clamp to valid range
+            # Clamp and normalize
             video = video.clamp(-1, 1).float()
             logging.info(f"Saving video tensor of shape {video.shape}, min={video.min().item():.4f}, max={video.max().item():.4f}")
 
             try:
-                # Normalize and scale to [0, 255]
+                # Normalize from [-1, 1] to [0, 255]
                 video_norm = ((video + 1.0) / 2.0 * 255.0).clamp(0, 255).to(torch.uint8)
 
-                # Reverse channel order (BGR -> RGB)
-                if video_norm.shape[0] == 3:
-                    logging.info("Reordering channels from BGR to RGB")
-                    video_norm = video_norm[[2, 1, 0], :, :, :]
+                # Add batch dimension
+                video_norm = video_norm[None]  # Shape: [1, 3, T, H, W]
+
+                # Convert RGB → BGR for OpenCV
+                video_norm = video_norm[:, [2, 1, 0], :, :, :]
 
                 logging.info(f"Normalized video tensor dtype: {video_norm.dtype}, shape: {video_norm.shape}, min: {video_norm.min()}, max: {video_norm.max()}")
 
                 cache_video(
-                    tensor=video_norm[None],  # Add batch dimension
+                    tensor=video_norm,
                     save_file=args.save_file,
                     fps=cfg.sample_fps,
                     nrow=1,
