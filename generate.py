@@ -137,6 +137,11 @@ def _parse_args():
         default=None,
         help="The prompt to generate the image or video from.")
     parser.add_argument(
+        "--n_prompt",
+        type=str,
+        default=None,
+        help="Negative prompt.")
+    parser.add_argument(
         "--use_prompt_extend",
         action="store_true",
         default=False,
@@ -319,7 +324,8 @@ def generate(args):
             sampling_steps=args.sample_steps,
             guide_scale=args.sample_guide_scale,
             seed=args.base_seed,
-            offload_model=args.offload_model)
+            offload_model=args.offload_model,
+            n_prompt=args.n_prompt)
 
     else:
         if args.prompt is None:
@@ -376,7 +382,8 @@ def generate(args):
             sampling_steps=args.sample_steps,
             guide_scale=args.sample_guide_scale,
             seed=args.base_seed,
-            offload_model=args.offload_model)
+            offload_model=args.offload_model,
+            n_prompt=args.n_prompt)
 
     if rank == 0:
         if args.save_file is None:
