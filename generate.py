@@ -381,7 +381,8 @@ def generate(args):
     if rank == 0:
         if args.save_file is None:
             formatted_time = datetime.now().strftime("%Y%m%d_%H%M%S")
-            formatted_prompt = args.prompt.replace(" ", "_").replace("/", "_")[:50]
+            formatted_prompt = args.prompt.replace(" ", "_").replace("/",
+                                                                     "_")[:50]
             suffix = '.png' if "t2i" in args.task else '.mp4'
             args.save_file = f"{args.task}_{args.size.replace('*','x') if sys.platform=='win32' else args.size}_{args.ulysses_size}_{args.ring_size}_{formatted_prompt}_{formatted_time}" + suffix
 
@@ -395,35 +396,14 @@ def generate(args):
                 value_range=(-1, 1))
         else:
             logging.info(f"Saving generated video to {args.save_file}")
-
-            # Clamp and normalize
-            video = video.clamp(-1, 1).float()
-            logging.info(f"Saving video tensor of shape {video.shape}, min={video.min().item():.4f}, max={video.max().item():.4f}")
-
-            try:
-                # Normalize from [-1, 1] to [0, 255]
-                video_norm = ((video + 1.0) / 2.0 * 255.0).clamp(0, 255).to(torch.uint8)
-
-                # Add batch dimension
-                video_norm = video_norm[None]  # Shape: [1, 3, T, H, W]
-
-                # Convert RGB → BGR for OpenCV
-                video_norm = video_norm[:, [2, 1, 0], :, :, :]
-
-                logging.info(f"Normalized video tensor dtype: {video_norm.dtype}, shape: {video_norm.shape}, min: {video_norm.min()}, max: {video_norm.max()}")
-
-                cache_video(
-                    tensor=video_norm,
-                    save_file=args.save_file,
-                    fps=cfg.sample_fps,
-                    nrow=1,
-                    normalize=False,
-                    value_range=(0, 255)
-                )
-            except Exception as e:
-                logging.error(f"cache_video failed, error: {e}")
-                with open(args.save_file, "wb") as f:
-                    f.write(b"\x00" * 8)
+            cache_video(
+                tensor=video[None],
+                save_file=args.save_file,
+                fps=cfg.sample_fps,
+                nrow=1,
+                normalize=True,
+                value_range=(-1, 1))
+    logging.info("Finished.")
 
 
 if __name__ == "__main__":
