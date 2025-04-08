@@ -403,73 +403,13 @@ def generate(args):
                 value_range=(-1, 1))
         else:
             logging.info(f"Saving generated video to {args.save_file}")
-            # Sanity check + fixup to prevent cast errors
-            logging.info(f"[DEBUG] Video tensor dtype: {video.dtype}, shape: {video.shape}, min: {video.min().item():.4f}, max: {video.max().item():.4f}")
-
-            try:
-               import torchvision.utils as vutils
-
-               # ---- Save as image sequence as fallback ----
-               def save_debug_frames(tensor, prefix="debug_frame"):
-                   b, c, t, h, w = tensor.shape
-                   for i in range(t):
-                       frame = tensor[0, :, i]  # shape [C, H, W]
-                       frame = torch.clamp((frame + 1) / 2, 0, 1)  # normalize to [0, 1]
-                       frame_path = f"{prefix}_{i:03d}.png"
-                       vutils.save_image(frame, frame_path)
-                       logging.info(f"Saved debug frame: {frame_path}")
-
-               # ---- Main video save logic ----
-               try:
-                   video = torch.clamp(video, -1, 1)
-
-                   # Normalize to [0,1], convert to uint8
-                   video = (video + 1) / 2
-                   video = (video * 255).to(torch.uint8)
-
-                   logging.info(f"[DEBUG] Final video shape: {video.shape}, dtype: {video.dtype}, min: {video.min()}, max: {video.max()}")
-
-                   cache_video(
-                       tensor=video,
-                       save_file=args.save_file,
-                       fps=cfg.sample_fps,
-                       nrow=1,
-                       normalize=False,  # already normalized
-                       value_range=(0, 255)  # already in byte range
-                   )
-               except Exception as e:
-                   logging.error(f"Final cache_video failed: {e}")
-                   logging.info("Falling back to individual frame save...")
-                   save_debug_frames(video, prefix="fallback")
-
-
-            except Exception as e:
-                logging.error(f"cache_video failed with error: {e}")
-                logging.info("Trying to clip tensor to [-1, 1] range and cast to float32...")
-
-                safe_video = video.clamp(-1, 1).float()
-                try:
-                    cache_video(
-                        tensor=safe_video[None],
-                        save_file=args.save_file,
-                        fps=cfg.sample_fps,
-                        nrow=1,
-                        normalize=True,
-                        value_range=(-1, 1)
-                    )
-                except Exception as e2:
-                    logging.error(f"Second attempt to save video also failed: {e2}")
-                    logging.info("Saving individual frames for inspection...")
-                    for i, frame in enumerate(safe_video):
-                        frame_path = f"debug_frame_{i}.png"
-                        cache_image(
-                            tensor=frame.unsqueeze(0),
-                            save_file=frame_path,
-                            nrow=1,
-                            normalize=True,
-                            value_range=(-1, 1)
-                        )
-
+            cache_video(
+                tensor=video[None],
+                save_file=args.save_file,
+                fps=cfg.sample_fps,
+                nrow=1,
+                normalize=True,
+                value_range=(-1, 1))
     logging.info("Finished.")
 
 
