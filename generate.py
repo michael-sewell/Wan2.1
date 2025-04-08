@@ -407,44 +407,41 @@ def generate(args):
             logging.info(f"[DEBUG] Video tensor dtype: {video.dtype}, shape: {video.shape}, min: {video.min().item():.4f}, max: {video.max().item():.4f}")
 
             try:
-               logging.info(f"[DEBUG] Raw video tensor dtype: {video.dtype}, shape: {video.shape}, min: {video.min().item():.4f}, max: {video.max().item():.4f}")
+               import torchvision.utils as vutils
 
+               # ---- Save as image sequence as fallback ----
+               def save_debug_frames(tensor, prefix="debug_frame"):
+                   b, c, t, h, w = tensor.shape
+                   for i in range(t):
+                       frame = tensor[0, :, i]  # shape [C, H, W]
+                       frame = torch.clamp((frame + 1) / 2, 0, 1)  # normalize to [0, 1]
+                       frame_path = f"{prefix}_{i:03d}.png"
+                       vutils.save_image(frame, frame_path)
+                       logging.info(f"Saved debug frame: {frame_path}")
+
+               # ---- Main video save logic ----
                try:
-                   # Reshape to match expected input: [B, C, T, H, W]
-                   if video.dim() == 4 and video.shape[0] == 3:
-                       video = video.unsqueeze(0).permute(0, 1, 2, 3, 4)  # Already CHW + T? Add batch
-                   elif video.dim() == 4 and video.shape[1] == 3:
-                       video = video.permute(0, 1, 2, 3).unsqueeze(0)  # Try to match [B, C, T, H, W]
-                   elif video.dim() == 3:
-                       raise ValueError(f"Unexpected 3D video shape: {video.shape}")
+                   video = torch.clamp(video, -1, 1)
 
-                   if video.dtype != torch.float32:
-                       video = video.float()
+                   # Normalize to [0,1], convert to uint8
+                   video = (video + 1) / 2
+                   video = (video * 255).to(torch.uint8)
 
-                   # Ensure values are clipped before normalization
-                   video = video.clamp(-1, 1)
+                   logging.info(f"[DEBUG] Final video shape: {video.shape}, dtype: {video.dtype}, min: {video.min()}, max: {video.max()}")
 
-                   logging.info(f"[DEBUG] Fixed video shape: {video.shape}, dtype: {video.dtype}")
                    cache_video(
                        tensor=video,
                        save_file=args.save_file,
                        fps=cfg.sample_fps,
                        nrow=1,
-                       normalize=True,
-                       value_range=(-1, 1)
+                       normalize=False,  # already normalized
+                       value_range=(0, 255)  # already in byte range
                    )
                except Exception as e:
                    logging.error(f"Final cache_video failed: {e}")
-                   logging.info("Saving frames for inspection instead...")
-                   for i, frame in enumerate(video[0].permute(1, 0, 2, 3)):  # T x C x H x W
-                       frame_path = f"frame_{i:03d}.png"
-                       cache_image(
-                           tensor=frame.unsqueeze(0),
-                           save_file=frame_path,
-                           nrow=1,
-                           normalize=True,
-                           value_range=(-1, 1)
-                       )
+                   logging.info("Falling back to individual frame save...")
+                   save_debug_frames(video, prefix="fallback")
+
 
             except Exception as e:
                 logging.error(f"cache_video failed with error: {e}")
