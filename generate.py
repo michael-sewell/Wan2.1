@@ -403,13 +403,45 @@ def generate(args):
                 value_range=(-1, 1))
         else:
             logging.info(f"Saving generated video to {args.save_file}")
-            cache_video(
-                tensor=video[None],
-                save_file=args.save_file,
-                fps=cfg.sample_fps,
-                nrow=1,
-                normalize=True,
-                value_range=(-1, 1))
+            # Sanity check + fixup to prevent cast errors
+            logging.info(f"[DEBUG] Video tensor dtype: {video.dtype}, shape: {video.shape}, min: {video.min().item():.4f}, max: {video.max().item():.4f}")
+
+            try:
+                cache_video(
+                    tensor=video[None],
+                    save_file=args.save_file,
+                    fps=cfg.sample_fps,
+                    nrow=1,
+                    normalize=True,
+                    value_range=(-1, 1)
+                )
+            except Exception as e:
+                logging.error(f"cache_video failed with error: {e}")
+                logging.info("Trying to clip tensor to [-1, 1] range and cast to float32...")
+
+                safe_video = video.clamp(-1, 1).float()
+                try:
+                    cache_video(
+                        tensor=safe_video[None],
+                        save_file=args.save_file,
+                        fps=cfg.sample_fps,
+                        nrow=1,
+                        normalize=True,
+                        value_range=(-1, 1)
+                    )
+                except Exception as e2:
+                    logging.error(f"Second attempt to save video also failed: {e2}")
+                    logging.info("Saving individual frames for inspection...")
+                    for i, frame in enumerate(safe_video):
+                        frame_path = f"debug_frame_{i}.png"
+                        cache_image(
+                            tensor=frame.unsqueeze(0),
+                            save_file=frame_path,
+                            nrow=1,
+                            normalize=True,
+                            value_range=(-1, 1)
+                        )
+
     logging.info("Finished.")
 
 
