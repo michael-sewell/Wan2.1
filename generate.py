@@ -325,7 +325,7 @@ def generate(args):
             guide_scale=args.sample_guide_scale,
             seed=args.base_seed,
             offload_model=args.offload_model,
-            n_prompt=args.n_prompt)
+            n_prompt=args.n_prompt or "")
 
     else:
         if args.prompt is None:
